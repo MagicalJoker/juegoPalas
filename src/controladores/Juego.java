@@ -7,237 +7,321 @@ import java.awt.image.BufferedImage;
 import java.util.ArrayList;
 import java.util.List;
 
+/**
+ * NO REFACTORIZADO.
+ * jmormez | 23-01-2025
+ * Clase que contenedra todo el funcionamiento del juego.
+ */
 public class Juego extends JPanel {
-    public int timeRemaining; // Tiempo restante en segundos
-    public Timer gameTimer;   // Temporizador para la cuenta regresiva
-    public Timer brickTimer;  // Temporizador para generar ladrillos en dificultad media
-    public Timer brickGenerationTimer; // Temporizador para dificultad baja
+    public int tiempoRestante; // Tiempo restante en segundos
+    public Timer temporizador;   // Temporizador para la cuenta regresiva
+    public Timer generarLadrillosDificultadMedia;  // Temporizador para generar ladrillos en dificultad media
+    public Timer temporizadorGenerarLadrillo; // Temporizador para dificultad baja
 
-    public final int WIDTH = 800, HEIGHT = 600;
-    public final int BALL_SIZE = 20, PADDLE_WIDTH = 100, PADDLE_HEIGHT = 10, BRICK_WIDTH = 60, BRICK_HEIGHT = 20;
-    public int ballSpeedX, ballSpeedY, paddleSpeed, score = 0, lives = 3;
-    public Rectangle ball, paddleBottom, paddleTop;
-    public List<Rectangle> bricks;
-    public Timer timer;
-    public boolean isGameRunning = true;
+    public final int anchoVentana = 800, altoVentana = 600; // Dimensiones de la ventana del juego
+    public final int tamanoPelota = 20, anchoPala = 100, altoPala = 10, anchoLadrillo = 60, altoLadrillo = 20; // Dimensiones de los elementos del juego
+    public int velocidadPelotaX, velocidadPelotaY, velocidadPala, puntuacion = 0, vidas = 3; // Velocidades, puntuación y vidas
+    public Rectangle pelota, palaInferior, palaSuperior; // Rectángulos que representan la pelota y las palas
+    public List<Rectangle> ladrillos; // Lista de ladrillos
+    public Timer temporizadorJuego; // Temporizador principal del juego
+    public boolean juegoEjecutandose = true; // Estado del juego
 
-    public Juego(String difficulty) {
-        JFrame frame = new JFrame("Juego de Pelota - Dificultad: " + difficulty);
-        frame.setSize(WIDTH, HEIGHT);
-        frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
-        frame.add(this);
-        frame.setLocationRelativeTo(null);
+    /**
+     * jmormez | 23-01-2025
+     * Constructor de la clase Juego.
+     * Inicializa la ventana del juego y configura los elementos iniciales.
+     *
+     * @param dificultad Dificultad del juego (baja o media).
+     */
+    public Juego(String dificultad) {
+        JFrame frame = new JFrame("Juego Palas - Dificultad: " + dificultad);
+        frame.setSize(anchoVentana, altoVentana); // Establece el tamaño de la ventana
+        frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE); // Cierra la aplicación al cerrar la ventana
+        frame.add(this); // Añade el panel del juego a la ventana
+        frame.setLocationRelativeTo(null); // Centra la ventana en la pantalla
 
-        setFocusable(true);
-        setBackground(Color.GRAY);
+        setFocusable(true); // Permite que el panel reciba eventos de teclado
+        setBackground(Color.DARK_GRAY); // Establece el color de fondo del panel
 
-        initGame(difficulty);
-        setupKeyListener();
-        startTimer();
+        iniciarJuego(dificultad); // Inicializa el juego según la dificultad
+        setupKeyListener(); // Configura el listener de teclado
+        startTimer(); // Inicia el temporizador del juego
 
-        timer = new Timer(1000 / 60, e -> {
-            updateGame();
-            repaint();
+        // Temporizador para actualizar el juego y repintar la pantalla
+        temporizadorJuego = new Timer(1000 / 60, e -> {
+            actualizarJuego(); // Actualiza la lógica del juego
+            repaint(); // Repinta el panel
         });
-        timer.start();
+        temporizadorJuego.start(); // Inicia el temporizador
 
-        frame.setVisible(true);
+        frame.setVisible(true); // Hace visible la ventana
     }
 
-    public void initGame(String difficulty) {
-        ball = new Rectangle(WIDTH / 2 - BALL_SIZE / 2, HEIGHT / 2 - BALL_SIZE / 2, BALL_SIZE, BALL_SIZE);
-        paddleBottom = new Rectangle(WIDTH / 2 - PADDLE_WIDTH / 2, HEIGHT - 40, PADDLE_WIDTH, PADDLE_HEIGHT);
+    /**
+     * jmormez | 23-01-2025
+     * Inicializa el juego configurando la pelota, las palas y los ladrillos.
+     *
+     * @param dificultadJuego Dificultad del juego (baja o media).
+     */
+    public void iniciarJuego(String dificultadJuego) {
+        // Inicializa la pelota en el centro de la pantalla
+        pelota = new Rectangle(anchoVentana / 2 - tamanoPelota / 2, altoVentana / 2 - tamanoPelota / 2, tamanoPelota, tamanoPelota);
+        // Inicializa la pala inferior
+        palaInferior = new Rectangle(anchoVentana / 2 - anchoPala / 2, altoVentana - 40, anchoPala, altoPala);
 
-        if (difficulty.equals("medium")) {
-            paddleTop = new Rectangle(WIDTH / 2 - PADDLE_WIDTH / 2, 30, PADDLE_WIDTH, PADDLE_HEIGHT);
-            ballSpeedX = 6;
-            ballSpeedY = 6;
-            startBrickGeneration();
+        // Configura la dificultad del juego
+        if (dificultadJuego.equals("medium")) {
+            // Dificultad media: añade pala superior y establece velocidades
+            palaSuperior = new Rectangle(anchoVentana / 2 - anchoPala / 2, 30, anchoPala, altoPala);
+            velocidadPelotaX = 6; // Velocidad de la pelota en el eje X
+            velocidadPelotaY = 6; // Velocidad de la pelota en el eje Y
+            generarLadrillosNormal(); // Inicia la generación de ladrillos
         } else {
-            ballSpeedX = 4;
-            ballSpeedY = 4;
-            startBrickGenerationForEasy();
+            // Dificultad baja: establece velocidades más lentas
+            velocidadPelotaX = 4; // Velocidad de la pelota en el eje X
+            velocidadPelotaY = 4; // Velocidad de la pelota en el eje Y
+            generarLadrillosFacil(); // Inicia la generación de ladrillos para dificultad fácil
         }
 
-        paddleSpeed = 15;
-        bricks = new ArrayList<>();
+        velocidadPala = 15; // Velocidad de movimiento de la pala
+        ladrillos = new ArrayList<>(); // Inicializa la lista de ladrillos
+        // Genera ladrillos en la parte superior de la pantalla
         for (int i = 0; i < 20; i++) {
-            bricks.add(new Rectangle(i % 10 * BRICK_WIDTH + 50, i / 10 * BRICK_HEIGHT + 100, BRICK_WIDTH, BRICK_HEIGHT));
+            ladrillos.add(new Rectangle(i % 10 * anchoLadrillo + 50, i / 10 * altoLadrillo + 100, anchoLadrillo, altoLadrillo));
         }
     }
 
+    /**
+     * jmormez | 23-01-2025
+     * Inicia el temporizador del juego que cuenta el tiempo restante.
+     */
     public void startTimer() {
-        timeRemaining = (paddleTop == null) ? 600 : 300; // 600 segundos para dificultad baja, 300 para media
+        // Establece el tiempo restante según la dificultad
+        tiempoRestante = (palaSuperior == null) ? 600 : 300; // 600 segundos para dificultad baja, 300 para media
 
-        gameTimer = new Timer(1000, e -> {
-            timeRemaining--;
-            if (timeRemaining <= 0) {
-                gameTimer.stop();
-                endGame(false); // Termina el juego si el tiempo llega a 0
+        // Temporizador que decrementa el tiempo restante cada segundo
+        temporizador = new Timer(1000, e -> {
+            tiempoRestante--; // Decrementa el tiempo restante
+            if (tiempoRestante <= 0) {
+                temporizador.stop(); // Detiene el temporizador
+                terminarJuego(false); // Termina el juego si el tiempo llega a 0
             }
             repaint(); // Actualiza la pantalla para mostrar el tiempo restante
         });
-        gameTimer.start();
+        temporizador.start(); // Inicia el temporizador
     }
 
-    public void startBrickGeneration() {
-        brickTimer = new Timer(15000, e -> {
-            if (bricks.size() < 50) {
+    /**
+     * jmormez | 23-01-2025
+     * Inicia la generación de ladrillos en dificultad media.
+     */
+    public void generarLadrillosNormal() {
+        // Temporizador que genera ladrillos cada 15 segundos
+        generarLadrillosDificultadMedia = new Timer(15000, e -> {
+            if (ladrillos.size() < 50) { // Limita la cantidad de ladrillos
                 for (int i = 0; i < 5; i++) {
-                    bricks.add(new Rectangle(i % 10 * BRICK_WIDTH + 50, (bricks.size() / 10) * BRICK_HEIGHT + 100, BRICK_WIDTH, BRICK_HEIGHT));
+                    // Añade nuevos ladrillos a la lista
+                    ladrillos.add(new Rectangle(i % 10 * anchoLadrillo + 50, (ladrillos.size() / 10) * altoLadrillo + 100, anchoLadrillo, altoLadrillo));
                 }
             }
         });
-        brickTimer.start();
+        generarLadrillosDificultadMedia.start(); // Inicia el temporizador de ladrillos
     }
 
-    public void startBrickGenerationForEasy() {
-        brickGenerationTimer = new Timer(120000, e -> { // 2 minutos en milisegundos
-            if (bricks.size() < 30) {
+    /**
+     * jmormez | 23-01-2025
+     * Inicia la generación de ladrillos en dificultad baja.
+     */
+    public void generarLadrillosFacil() {
+        // Temporizador que genera ladrillos cada 2 minutos
+        temporizadorGenerarLadrillo = new Timer(120000, e -> { // 2 minutos en milisegundos
+            if (ladrillos.size() < 30) { // Limita la cantidad de ladrillos
                 for (int i = 0; i < 5; i++) {
-                    bricks.add(new Rectangle(i % 10 * BRICK_WIDTH + 50, (bricks.size() / 10) * BRICK_HEIGHT + 100, BRICK_WIDTH, BRICK_HEIGHT));
+                    // Añade nuevos ladrillos a la lista
+                    ladrillos.add(new Rectangle(i % 10 * anchoLadrillo + 50, (ladrillos.size() / 10) * altoLadrillo + 100, anchoLadrillo, altoLadrillo));
                 }
             }
         });
-        brickGenerationTimer.start();
+        temporizadorGenerarLadrillo.start(); // Inicia el temporizador de generación de ladrillos
     }
 
+    /**
+     * jmormez | 23-01-2025
+     * Configura el listener de teclado para controlar las palas.
+     */
     public void setupKeyListener() {
+        // Añade un KeyListener para manejar las teclas presionadas
         addKeyListener(new KeyAdapter() {
             @Override
             public void keyPressed(KeyEvent e) {
-                int key = e.getKeyCode();
-                if (key == KeyEvent.VK_LEFT && paddleBottom.x > 0) {
-                    paddleBottom.x -= paddleSpeed;
-                    if (paddleTop != null) paddleTop.x -= paddleSpeed;
-                } else if (key == KeyEvent.VK_RIGHT && paddleBottom.x < WIDTH - PADDLE_WIDTH) {
-                    paddleBottom.x += paddleSpeed;
-                    if (paddleTop != null) paddleTop.x += paddleSpeed;
+                int tecla = e.getKeyCode(); // Obtiene el código de la tecla presionada
+                // Mueve la pala hacia la izquierda
+                if (tecla == KeyEvent.VK_LEFT && palaInferior.x > 0) {
+                    palaInferior.x -= velocidadPala; // Mueve la pala hacia la izquierda
+                    if (palaSuperior != null) palaSuperior.x -= velocidadPala; // Mueve la pala superior si existe
+                } 
+                // Mueve la pala hacia la derecha
+                else if (tecla == KeyEvent.VK_RIGHT && palaInferior.x < anchoVentana - anchoPala) {
+                    palaInferior.x += velocidadPala; // Mueve la pala hacia la derecha
+                    if (palaSuperior != null) palaSuperior.x += velocidadPala; // Mueve la pala superior si existe
                 }
             }
         });
     }
 
-    public void updateGame() {
-        if (!isGameRunning) return;
+    /**
+     * jmormez | 23-01-2025
+     * Actualiza la lógica del juego, incluyendo el movimiento de la pelota y las colisiones.
+     */
+    public void actualizarJuego() {
+        if (!juegoEjecutandose) return; // Si el juego no está en ejecución, no hace nada
 
-        ball.x += ballSpeedX;
-        ball.y += ballSpeedY;
+        // Actualiza la posición de la pelota
+        pelota.x += velocidadPelotaX;
+        pelota.y += velocidadPelotaY;
 
         // Rebote en paredes laterales
-        if (ball.x <= 0 || ball.x >= WIDTH - BALL_SIZE) {
-            ballSpeedX *= -1;
+        if (pelota.x <= 0 || pelota.x >= anchoVentana - tamanoPelota) {
+            velocidadPelotaX *= -1; // Invierte la dirección en el eje X
         }
 
         // Rebote en la pared superior solo en dificultad baja
-        if (ball.y <= 0) {
-            if (paddleTop == null) { // En dificultad baja, rebota
-                ballSpeedY *= -1;
+        if (pelota.y <= 0) {
+            if (palaSuperior == null) { // En dificultad baja, rebota
+                velocidadPelotaY *= -1; // Invierte la dirección en el eje Y
             } else { // En dificultad media, se pierde una vida
-                lives--;
-                score = Math.max(0, score - 5); // Resta 5 puntos
-                if (lives == 0) {
-                    endGame(false);
+                vidas--; // Resta una vida
+                puntuacion = Math.max(0, puntuacion - 5); // Resta 5 puntos por cada vida perdida
+                if (vidas == 0) {
+                    terminarJuego(false); // Termina el juego si no quedan vidas
                 } else {
-                    resetBall();
+                    reiniciarPelota(); // Reinicia la posición de la pelota
                 }
             }
         }
 
         // Rebote en palas
-        if (ball.intersects(paddleBottom) || (paddleTop != null && ball.intersects(paddleTop))) {
-            ballSpeedY *= -1;
+        if (pelota.intersects(palaInferior) || (palaSuperior != null && pelota.intersects(palaSuperior))) {
+            velocidadPelotaY *= -1; // Invierte la dirección en el eje Y
         }
 
         // Pierde una vida si toca la pared inferior (en ambas dificultades)
-        if (ball.y > HEIGHT) {
-            lives--;
-            score = Math.max(0, score - 5); // Resta 5 puntos
-            if (lives == 0) {
-                endGame(false);
+        if (pelota.y > altoVentana) {
+            vidas--; // Resta una vida
+            puntuacion = Math.max(0, puntuacion - 5); // Resta 5 puntos por cada vida perdida
+            if (vidas == 0) {
+                terminarJuego(false); // Termina el juego si no quedan vidas
             } else {
-                resetBall();
+                reiniciarPelota(); // Reinicia la posición de la pelota
             }
         }
 
         // Colisión con ladrillos
-        bricks.removeIf(brick -> {
-            if (ball.intersects(brick)) {
-                ballSpeedY *= -1;
-                score += 10;
-                checkVictory(); // Verificar si el jugador ha ganado
-                return true;
+        ladrillos.removeIf(ladrillo -> {
+            if (pelota.intersects(ladrillo)) { // Si la pelota colisiona con un ladrillo
+                velocidadPelotaY *= -1; // Invierte la dirección en el eje Y
+                puntuacion += 10; // Aumenta la puntuación
+                comprobarVictoria(); // Verifica si el jugador ha ganado
+                return true; // El ladrillo se elimina
             }
-            return false;
+            return false; // El ladrillo no se elimina
         });
     }
 
-    public void checkVictory() {
-        int targetScore = (paddleTop == null) ? 300 : 500; // Baja: 300, Media: 500
-        if (score >= targetScore) {
-            endGame(true); // Finaliza el juego con victoria
+    /**
+     * jmormez | 23-01-2025
+     * Verifica si el jugador ha alcanzado la puntuación objetivo para ganar.
+     */
+    public void comprobarVictoria() {
+        int objetivoDePuntos = (palaSuperior == null) ? 300 : 500; // Baja: 300, Media: 500
+        if (puntuacion >= objetivoDePuntos) {
+            terminarJuego(true); // Finaliza el juego con victoria
         }
     }
 
-    public void resetBall() {
-        ball.setLocation(WIDTH / 2 - BALL_SIZE / 2, HEIGHT / 2 - BALL_SIZE / 2);
+    /**
+     * jmormez | 23-01-2025
+     * Reinicia la posición de la pelota al centro de la pantalla.
+     */
+    public void reiniciarPelota() {
+        pelota.setLocation(anchoVentana / 2 - tamanoPelota / 2, altoVentana / 2 - tamanoPelota / 2); // Coloca la pelota en el centro
     }
 
-    public void endGame(boolean hasWon) {
-        isGameRunning = false;
-        timer.stop();
-        if (gameTimer != null) gameTimer.stop();
-        if (brickTimer != null) brickTimer.stop();
-        if (brickGenerationTimer != null) brickGenerationTimer.stop();
+    /**
+     * jmormez | 23-01-2025
+     * Termina el juego y muestra un mensaje de victoria o derrota.
+     *
+     * @param haGanado Indica si el jugador ha ganado o no.
+     */
+    public void terminarJuego(boolean haGanado) {
+        juegoEjecutandose = false; // Cambia el estado del juego a no en ejecución
+        temporizadorJuego.stop(); // Detiene el temporizador principal
+        if (temporizador != null) temporizador.stop(); // Detiene el temporizador de juego
+        if (generarLadrillosDificultadMedia != null) generarLadrillosDificultadMedia.stop(); // Detiene el temporizador de ladrillos
+        if (temporizadorGenerarLadrillo != null) temporizadorGenerarLadrillo.stop(); // Detiene el temporizador de generación de ladrillos
 
-        String message = hasWon ? "¡Has ganado! Puntuación final: " + score : "Juego Terminado. Puntuación final: " + score;
-        JOptionPane.showMessageDialog(this, message);
-        System.exit(0);
+        // Muestra un mensaje de finalización del juego
+        String mensajeFinal = haGanado ? "¡Has ganado! Puntuación final: " + puntuacion : "Fin del juego. Puntuación final: " + puntuacion;
+        JOptionPane.showMessageDialog(this, mensajeFinal); // Muestra el mensaje en un cuadro de diálogo
+        System.exit(0); // Cierra la aplicación
     }
 
     @Override
     protected void paintComponent(Graphics g) {
-        super.paintComponent(g);
+        super.paintComponent(g); // Llama al método de la superclase para limpiar el panel
 
-        // Doble búfer
+        // Dibujo en un búfer para evitar parpadeos
         BufferedImage buffer = new BufferedImage(getWidth(), getHeight(), BufferedImage.TYPE_INT_ARGB);
-        Graphics2D g2d = buffer.createGraphics();
+        Graphics2D g2d = buffer.createGraphics(); // Crea un objeto Graphics2D para dibujar en el búfer
 
-        drawGame(g2d);
-        g.drawImage(buffer, 0, 0, null);
-        g2d.dispose();
+        dibujarJuego(g2d); // Dibuja el estado del juego en el búfer
+        g.drawImage(buffer, 0, 0, null); // Dibuja el búfer en el panel
+        g2d.dispose(); // Libera los recursos del objeto Graphics2D
     }
 
-    public void drawGame(Graphics g) {
-        g.setColor(Color.BLACK);
-        g.setFont(new Font("Arial", Font.BOLD, 16));
-        g.drawString("Puntos: " + score, 20, 50);
-        g.drawString("Vidas: " + lives, 20, 70);
-        g.drawString("Tiempo: " + formatTime(timeRemaining), WIDTH - 150, 50);
+    /**
+     * jmormez | 23-01-2025
+     * Dibuja todos los elementos del juego en el gráfico proporcionado.
+     *
+     * @param g Objeto Graphics en el que se dibujan los elementos del juego.
+     */
+    public void dibujarJuego(Graphics g) {
+        g.setColor(Color.BLACK); // Establece el color del texto
+        g.setFont(new Font("Arial", Font.BOLD , 16)); // Establece la fuente del texto
+        g.drawString("Puntos: " + puntuacion, 20, 50); // Dibuja la puntuación en la pantalla
+        g.drawString("Vidas: " + vidas, 20, 70); // Dibuja el número de vidas restantes
+        g.drawString("Tiempo: " + formatTime(tiempoRestante), anchoVentana - 150, 50); // Dibuja el tiempo restante
 
-        g.setColor(Color.RED);
-        g.fillOval(ball.x, ball.y, ball.width, ball.height);
+        g.setColor(Color.WHITE); // Establece el color de la pelota
+        g.fillOval(pelota.x, pelota.y, pelota.width, pelota.height); // Dibuja la pelota
 
-        g.setColor(Color.BLUE);
-        g.fillRect(paddleBottom.x, paddleBottom.y, paddleBottom.width, paddleBottom.height);
-        if (paddleTop != null) {
-            g.fillRect(paddleTop.x, paddleTop.y, paddleTop.width, paddleTop.height);
+        g.setColor(Color.BLUE); // Establece el color de la pala inferior
+        g.fillRect(palaInferior.x, palaInferior.y, palaInferior.width, palaInferior.height); // Dibuja la pala inferior
+        if (palaSuperior != null) { // Si existe la pala superior
+            g.fillRect(palaSuperior.x, palaSuperior.y, palaSuperior.width, palaSuperior.height); // Dibuja la pala superior
         }
 
         g.setColor(Color.GREEN); // Color para el interior del ladrillo
-        for (Rectangle brick : bricks) {
-            g.fillRect(brick.x, brick.y, brick.width, brick.height); // Rellenar el ladrillo
+        for (Rectangle ladrillo : ladrillos) { // Itera sobre cada ladrillo
+            g.fillRect(ladrillo.x, ladrillo.y, ladrillo.width, ladrillo.height); // Rellena el ladrillo
 
             g.setColor(Color.RED); // Color para el borde del ladrillo
-            g.drawRect(brick.x, brick.y, brick.width, brick.height); // Dibujar el borde
-            g.setColor(Color.GREEN); // Volver a poner el color del interior
+            g.drawRect(ladrillo.x, ladrillo.y, ladrillo.width, ladrillo.height); // Dibuja el borde del ladrillo
+            g.setColor(Color.GREEN); // Vuelve a poner el color del interior
         }
     }
 
-    public String formatTime(int seconds) {
-        int minutes = seconds / 60;
-        int remainingSeconds = seconds % 60;
-        return String.format("%02d:%02d", minutes, remainingSeconds);
+    /**
+     * jmormez | 23-01-2025
+     * Formatea el tiempo en segundos a un formato de minutos y segundos.
+     *
+     * @param segundos Tiempo en segundos.
+     * @return Cadena formateada en el formato "MM:SS".
+     */
+    public String formatTime(int segundos) {
+        int minutos = segundos / 60; // Calcula los minutos
+        int segundosRestantes = segundos % 60; // Calcula los segundos restantes
+        return String.format("%02d:%02d", minutos, segundosRestantes); // Devuelve el tiempo formateado
     }
 }
 
